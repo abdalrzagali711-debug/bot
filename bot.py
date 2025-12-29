@@ -1,29 +1,41 @@
 import asyncio
 from aiohttp import web
 from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from rembg import remove
+from PIL import Image
+import io
 
-TOKEN = "ضع_توكن_بوتك_هنا"
+TOKEN = "8297837826:AAHj6l32pQFrxduUTEAsAPzDr09_9mBDILc"
 PORT = 10000  # Render uses this
 
-
-# ====== Telegram Handlers ======
+# ====== Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(f"اهلاً يا {user.first_name} 👋\nالبوت شغال 24 ساعة 🔥")
 
+async def remove_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.photo:
+        file = await update.message.photo[-1].get_file()
+        img_bytes = await file.download_as_bytearray()
+        output = remove(img_bytes)
+        await update.message.reply_photo(photo=output)
+    else:
+        await update.message.reply_text("ارسل صورة لحذف الخلفية")
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("البوت شغال الحمد لله 😎")
+async def to_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.photo:
+        file = await update.message.photo[-1].get_file()
+        img_bytes = await file.download_as_bytearray()
+        image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        with io.BytesIO() as output:
+            image.save(output, format="WEBP")
+            output.seek(0)
+            await update.message.reply_sticker(sticker=output)
+    else:
+        await update.message.reply_text("ارسل صورة لتحويلها لملصق")
 
-
-# ====== Web Server (for Render keep alive) ======
+# ====== Web Server ======
 async def handle(request):
     return web.Response(text="Bot is Running ✔️")
 
@@ -36,13 +48,13 @@ async def run_web():
     await site.start()
     print(f"🌍 Web Server Running on port {PORT}")
 
-
-# ====== Telegram Bot Runner ======
+# ====== Bot Runner ======
 async def run_bot():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT, echo))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.Caption("/remove_bg"), remove_bg))
+    app.add_handler(MessageHandler(filters.PHOTO & filters.Caption("/sticker"), to_sticker))
 
     await app.initialize()
     await app.start()
@@ -51,11 +63,9 @@ async def run_bot():
 
     await asyncio.Event().wait()   # keep bot alive
 
-
 # ====== MAIN ======
 async def main():
     await asyncio.gather(run_web(), run_bot())
-
 
 if __name__ == "__main__":
     asyncio.run(main())
