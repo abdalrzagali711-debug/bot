@@ -2,4 +2,5 @@ python-telegram-bot==21.6
 rembg
 Pillow
 aiohttp
-onnxruntime
+onnxruntime-cpu
+
