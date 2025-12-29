@@ -3,3 +3,4 @@ aiohttp
 rembg
 Pillow
 opencv-python-headless
+onnxruntime
