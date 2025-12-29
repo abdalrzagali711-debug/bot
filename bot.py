@@ -3,10 +3,7 @@ from io import BytesIO
 from PIL import Image
 from rembg import remove
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from aiohttp import web
 
 TOKEN = os.environ.get("BOT_TOKEN")  # ضع توكن بوتك في متغير BOT_TOKEN على Render
@@ -26,7 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+
     if query.data == 'main':
         await start(update, context)
         return
@@ -38,8 +35,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_bytes = context.user_data["last_photo"]
 
     if query.data == 'remove_bg':
-        output = remove(photo_bytes)
-        await query.message.reply_photo(photo=output, caption="تم إزالة الخلفية!")
+        output_bytes = remove(BytesIO(photo_bytes))
+        await query.message.reply_photo(photo=BytesIO(output_bytes), caption="تم إزالة الخلفية!")
     elif query.data == 'to_sticker':
         img = Image.open(BytesIO(photo_bytes))
         bio = BytesIO()
@@ -56,7 +53,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["last_photo"] = photo_bytes.getvalue()
     await update.message.reply_text("تم استلام الصورة! الآن اختر العملية من الأزرار.")
 
-# إعداد Web Server بسيط لتجنب مشاكل Render
+# Web Server
 async def index(request):
     return web.Response(text="بوت Telegram شغال!")
 
@@ -67,17 +64,19 @@ async def main():
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # تشغيل ويب سيرفر aiohttp
-    runner = web.AppRunner(web.Application())
+    # ويب سيرفر Render
+    web_app = web.Application()
+    web_app.add_routes([web.get("/", index)])
+    runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 10000)))
     await site.start()
 
     print("🌍 Web Server Running on port", os.environ.get("PORT", 10000))
     print("🤖 Bot Started...")
-    await app.start()
-    await app.updater.start_polling()
-    await app.updater.idle()
+
+    # تشغيل البوت 24 ساعة
+    await app.run_polling()
 
 if __name__ == "__main__":
     import asyncio
