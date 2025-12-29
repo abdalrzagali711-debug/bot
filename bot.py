@@ -1,4 +1,3 @@
-import os
 import asyncio
 from aiohttp import web
 from telegram import Update
@@ -6,45 +5,31 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    filters,
-    ContextTypes
+    ContextTypes,
+    filters
 )
 
-TOKEN = os.getenv("TOKEN")
-PORT = int(os.getenv("PORT", 10000))
+TOKEN = "ضع_توكن_بوتك_هنا"
+PORT = 10000  # Render uses this
 
 
+# ====== Telegram Handlers ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.effective_user.first_name
-    await update.message.reply_text(f"مرحبًا يا {name} 👋\nالبوت شغال تمام ❤️")
+    user = update.effective_user
+    await update.message.reply_text(f"اهلاً يا {user.first_name} 👋\nالبوت شغال 24 ساعة 🔥")
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔥 البوت شغال 24 ساعة إن شاء الله")
+    await update.message.reply_text("البوت شغال الحمد لله 😎")
 
 
-async def run_bot():
-    app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT, echo))
-
-    # تشغيل البوت يدويًا بدون run_polling
-    await app.initialize()
-    await app.start()
-    print("🤖 Bot Started...")
-
-    # نمنعه من الإغلاق
-    await asyncio.Event().wait()
-
+# ====== Web Server (for Render keep alive) ======
+async def handle(request):
+    return web.Response(text="Bot is Running ✔️")
 
 async def run_web():
-    async def home(request):
-        return web.Response(text="Bot is Running ✔️")
-
     app = web.Application()
-    app.router.add_get("/", home)
-
+    app.add_routes([web.get("/", handle)])
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
@@ -52,8 +37,24 @@ async def run_web():
     print(f"🌍 Web Server Running on port {PORT}")
 
 
+# ====== Telegram Bot Runner ======
+async def run_bot():
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT, echo))
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    print("🤖 Bot Running...")
+
+    await asyncio.Event().wait()   # keep bot alive
+
+
+# ====== MAIN ======
 async def main():
-    await asyncio.gather(run_bot(), run_web())
+    await asyncio.gather(run_web(), run_bot())
 
 
 if __name__ == "__main__":
