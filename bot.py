@@ -2,7 +2,13 @@ import os
 import asyncio
 from aiohttp import web
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 TOKEN = os.getenv("TOKEN")
 PORT = int(os.getenv("PORT", 10000))
@@ -14,7 +20,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("البوت شغال 🙌")
+    await update.message.reply_text("🔥 البوت شغال 24 ساعة إن شاء الله")
 
 
 async def run_bot():
@@ -23,17 +29,21 @@ async def run_bot():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, echo))
 
+    # تشغيل البوت يدويًا بدون run_polling
     await app.initialize()
     await app.start()
     print("🤖 Bot Started...")
 
+    # نمنعه من الإغلاق
+    await asyncio.Event().wait()
 
-async def web_server():
-    async def handle(request):
+
+async def run_web():
+    async def home(request):
         return web.Response(text="Bot is Running ✔️")
 
     app = web.Application()
-    app.router.add_get("/", handle)
+    app.router.add_get("/", home)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -43,7 +53,7 @@ async def web_server():
 
 
 async def main():
-    await asyncio.gather(run_bot(), web_server())
+    await asyncio.gather(run_bot(), run_web())
 
 
 if __name__ == "__main__":
