@@ -1,4 +1,5 @@
 python-telegram-bot==21.6
 aiohttp
-Pillow
 rembg
+Pillow
+opencv-python-headless
