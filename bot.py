@@ -1,91 +1,29 @@
 import os
-from io import BytesIO
-from PIL import Image
-from rembg import remove
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters
-)
-from aiohttp import web
-import asyncio
+from flask import Flask, request
+import requests
 
-# ضع توكن بوتك في متغير البيئة BOT_TOKEN على Render
-TOKEN = os.environ.get("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN")
+URL = f"https://api.telegram.org/bot{TOKEN}"
 
-# رسالة ترحيبية
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.effective_user.first_name
-    keyboard = [
-        [InlineKeyboardButton("حذف الخلفية", callback_data='remove_bg')],
-        [InlineKeyboardButton("تحويل إلى ملصق", callback_data='to_sticker')],
-        [InlineKeyboardButton("الرئيسية", callback_data='main')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(f"أهلاً {username}! اختر ما تريد:", reply_markup=reply_markup)
+app = Flask(__name__)
 
-# معالجة الأزرار
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data == 'main':
-        await start(update, context)
-        return
+@app.route("/")
+def home():
+    return "Bot is Running 🔥"
 
-    if not context.user_data.get("last_photo"):
-        await query.edit_message_text("أرسل صورة أولاً قبل اختيار هذا الخيار.")
-        return
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    data = request.get_json()
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
 
-    photo_bytes = context.user_data["last_photo"]
+        requests.get(f"{URL}/sendMessage", params={
+            "chat_id": chat_id,
+            "text": f"تم الاستلام: {text}"
+        })
 
-    if query.data == 'remove_bg':
-        output = remove(photo_bytes)
-        await query.message.reply_photo(photo=output, caption="تم إزالة الخلفية!")
-    elif query.data == 'to_sticker':
-        img = Image.open(BytesIO(photo_bytes))
-        bio = BytesIO()
-        bio.name = 'sticker.png'
-        img.save(bio, 'PNG')
-        bio.seek(0)
-        await query.message.reply_sticker(sticker=bio)
-
-# حفظ الصورة المرسلة
-async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    photo_file = await update.message.photo[-1].get_file()
-    photo_bytes = BytesIO()
-    await photo_file.download(out=photo_bytes)
-    context.user_data["last_photo"] = photo_bytes.getvalue()
-    await update.message.reply_text("تم استلام الصورة! الآن اختر العملية من الأزرار.")
-
-# إعداد Web Server بسيط لتجنب مشاكل Render
-async def index(request):
-    return web.Response(text="بوت Telegram شغال!")
-
-async def run_web():
-    app = web.Application()
-    app.router.add_get("/", index)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    PORT = int(os.environ.get("PORT", 10000))
-    site = web.TCPSite(runner, '0.0.0.0', PORT)
-    await site.start()
-    print("🌍 Web Server Running on port", PORT)
-
-async def run_bot():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
-    app.add_handler(CallbackQueryHandler(button_handler))
-
-    print("🤖 Bot Started...")
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    await app.updater.idle()
-
-async def main():
-    await asyncio.gather(run_web(), run_bot())
+    return {"ok": True}
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
